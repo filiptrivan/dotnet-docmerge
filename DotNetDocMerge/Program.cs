@@ -212,8 +212,8 @@ class Program
             padding-top: 80px;
             margin-top: -80px; /* HACK: Because of header and toc goto */
         }
-        pre { padding: 0 18px !important; margin: 0 !important; position: relative; }
-        code { padding: 12px 0 0 0 !important; }
+        pre { padding: 12px 18px 0 18px !important; margin: 0 !important; position: relative; }
+        code { padding: 0 !important; background-color: transparent !important; }
         .namespace { color: var(--p-surface-500); font-size: 0.9em; margin-bottom: 15px; }
         .copy-button {
           position: absolute;

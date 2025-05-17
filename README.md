@@ -1,6 +1,10 @@
 # DotNetDocMerge
 
-A .NET global tool that generates a single HTML documentation file from XML documentation comments in C# files.
+A .NET global tool that generates a single HTML documentation file from XML documentation summaries in C# files.
+
+## Video Usage Example
+
+https://youtu.be/NnHIXMs4BPI?si=NCk0NdRwvOKnA0-d
 
 ## Features
 
