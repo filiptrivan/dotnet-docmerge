@@ -110,6 +110,8 @@ class Program
                                 .Replace("</b>", "</h3>")
                                 .Replace("<i>", "<span class=\"code-block\">")
                                 .Replace("</i>", "</span>")
+                                .Replace("{", "&lbrace;")
+                                .Replace("}", "&rbrace;")
                                 .Trim();
 
                             summaryText = ProcessCodeBlocks(summaryText);
@@ -126,7 +128,38 @@ class Program
 
     static string ProcessCodeBlocks(string text)
     {
-        text = text.Replace("<code>", "<pre class=\"card\"><button class=\"copy-button\" onclick=\"copyCode(this)\">Copy</button><code class=\"language-csharp\">").Replace("</code>", "</code></pre>");
+        // First, find all code blocks and store them
+        var codeBlocks = new List<string>();
+        var regex = new Regex(@"<code>(.*?)</code>", RegexOptions.Singleline);
+        text = regex.Replace(text, match =>
+        {
+            string codeContent = match.Groups[1].Value;
+            // Replace special characters that might cause issues in HTML/JavaScript
+            codeContent = codeContent
+                .Replace("<", "&lt;")
+                .Replace(">", "&gt;")
+                .Replace("\"", "&quot;")
+                .Replace("'", "&#39;")
+                .Replace("`", "&#96;");
+            
+            codeBlocks.Add(codeContent);
+            return $"<code>{codeBlocks.Count - 1}</code>";
+        });
+
+        // Now replace the code blocks with the proper HTML structure
+        for (int i = 0; i < codeBlocks.Count; i++)
+        {
+            text = text.Replace($"<code>{i}</code>", $"""
+<div class="code-snippet-wrapper card">
+    <div class="copy-button-wrapper">
+        <app-copy-button (onClick)="copyCodeSnippet($event)"></app-copy-button>
+    </div>
+    <pre><code language="csharp" [highlight]="`{codeBlocks[i]}`">
+    </code></pre>
+</div>
+"""
+            );
+        }
 
         string[] lines = text.Split('\n');
         List<string> processedLines = new();
@@ -195,99 +228,68 @@ class Program
     {
         StringBuilder sb = new();
         
-        // Start HTML document
-        sb.AppendLine("<!DOCTYPE html>");
-        sb.AppendLine("<html lang=\"en\">");
-        sb.AppendLine("<head>");
-     
-        // Add custom CSS
-        sb.AppendLine("""
-    <style>
-        .toc { margin-bottom: 18px; }
-        h1 { margin-bottom: 30px; }
-        h2 { margin-bottom: 12px; }
-        h3 { margin-bottom: 9px; }
-        .doc-section { 
-            margin-bottom: 18px; 
-            padding-top: 80px;
-            margin-top: -80px; /* HACK: Because of header and toc goto */
-        }
-        pre { padding: 12px 18px 0 18px !important; margin: 0 !important; position: relative; }
-        code { padding: 0 !important; background-color: transparent !important; }
-        .namespace { color: var(--p-surface-500); font-size: 0.9em; margin-bottom: 15px; }
-        .copy-button {
-          position: absolute;
-          top: 6px;
-          right: 6px;
-          padding: 4px 8px;
-          background: var(--p-surface-500);
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 12px;
-          opacity: 0.7;
-          transition: opacity 0.2s;
-        }
-        .copy-button:hover {
-          opacity: 1;
-        }
-    </style>
-    <script>
-        function copyCode(button) {
-            const pre = button.parentElement;
-            const code = pre.querySelector('code');
-            const text = code.textContent;
-            
-            navigator.clipboard.writeText(text).then(() => {
-                const originalText = button.textContent;
-                button.textContent = 'Copied!';
-                
-                setTimeout(() => {
-                    button.textContent = originalText;
-                }, 2000);
-            });
-        }
-    </script>
-""");
-        sb.AppendLine("</head>");
-        sb.AppendLine("<body>");
-
         string formattedTitle = Regex.Replace(folderName, "([A-Z])", " $1").Trim();
-        sb.AppendLine($"<h1 class=\"gradient-title\">Spiderly {formattedTitle}</h1>");
         
+        sb.AppendLine($"""
+<div>
+    <h1 class="gradient-title">Spiderly {formattedTitle}</h1>
+    
+    <div class="toc card">
+        <h2>Table of Contents</h2>
+        <ul>
+""");
+
         var sortedItems = items.OrderBy(item => item.Title).ToList();
         
-        // Table of Contents
-        sb.AppendLine("<div class=\"toc card\">");
-        sb.AppendLine("  <h2>Table of Contents</h2>");
-        sb.AppendLine("  <ul>");
+        // Generate table of contents with routerLink
         foreach (DocumentationItem item in sortedItems)
         {
             string anchor = item.Title.ToKebabCase();
-            sb.AppendLine($"    <li><a href=\"docs/{folderName.ToKebabCase()}/#{anchor}\">{item.Title}</a></li>");
-        }
-        sb.AppendLine("  </ul>");
-        sb.AppendLine("</div>");
-        
-        foreach (DocumentationItem item in sortedItems)
-        {
-            string anchor = item.Title.ToKebabCase();
-            sb.AppendLine($"<section id=\"{anchor}\" class=\"doc-section\">");
-            sb.AppendLine($"  <div class=\"card\">");
-            sb.AppendLine($"    <h2>{item.Title}</h2>");
-            sb.AppendLine($"    <div class=\"namespace\">Namespace: {item.Namespace}</div>");
-            
-            foreach (string summary in item.Summaries)
-            {
-                sb.AppendLine($"    <div class=\"summary\">{summary}</div>");
-            }
-            sb.AppendLine("  </div>");
-            sb.AppendLine("</section>");
+            sb.AppendLine($"""
+            <li>
+                <a [routerLink]="['/docs', '{folderName.ToKebabCase()}']" 
+                    [fragment]="'{anchor}'"
+                    title="Go to {item.Title}">
+                    {item.Title}
+                </a>
+            </li>
+""");
         }
 
-        sb.AppendLine("</body>");
-        sb.AppendLine("</html>");
+        sb.AppendLine("""
+        </ul>
+    </div>
+
+""");
+
+        foreach (DocumentationItem item in sortedItems)
+        {
+            string anchor = item.Title.ToKebabCase();
+            sb.AppendLine($"""
+    <section id="{anchor}" class="doc-section">
+        <div class="card">
+            <h2>{item.Title}</h2>
+            <div class="namespace">Namespace: {item.Namespace}</div>
+""");
+
+            foreach (string summary in item.Summaries)
+            {
+                sb.AppendLine($"""
+            <div class="summary">
+{summary}
+            </div>
+""");
+            }
+
+            sb.AppendLine("""
+        </div>
+    </section>
+""");
+        }
         
+            sb.AppendLine("""
+</div>
+""");
         return sb.ToString();
     }
 }
